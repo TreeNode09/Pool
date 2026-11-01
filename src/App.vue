@@ -1,180 +1,72 @@
 <template>
-  <main class="page">
-    <h1>拍照</h1>
-    <p class="status" :data-state="status">{{ statusText }}</p>
-    <p v-if="status === 'error'" class="error">{{ loadError }}</p>
-    <p v-if="status === 'ready'" class="time">OpenCV 加载时间：{{ loadTime.toFixed(0) }}ms</p>
-
-    <label class="pick">
-      拍照或从相册选择
-      <input
-        type="file"
-        accept="image/*"
-        capture="environment"
-        :disabled="status !== 'ready'"
-        @change="onPick"
-      />
-    </label>
-
-    <p v-if="processError" class="error">{{ processError }}</p>
-    <p v-if="matInfo" class="mat">
-      宽 {{ matInfo.width }} · 高 {{ matInfo.height }} · 通道 {{ matInfo.channels }}
-    </p>
-    <p v-else-if="status === 'ready'" class="hint">选择一张照片后，这里会显示 Mat 的尺寸。</p>
-
-    <canvas v-show="matInfo" ref="canvasEl" class="preview"></canvas>
-  </main>
+  <HomeView v-if="page === 'home'" @start="openCapture" />
+  <CaptureView v-else :stream="captureStream" @back="closeCapture" />
+  <div class="landscape">请竖屏使用</div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, shallowRef } from 'vue'
-import { waitForOpencv } from './opencv.js'
+import { ref, shallowRef } from 'vue'
+import HomeView from './HomeView.vue'
+import CaptureView from './CaptureView.vue'
 
-const status = ref('loading')
-const loadError = ref('')
-const imageUrl = ref('')
-const matInfo = ref(null)
-const processError = ref('')
-const canvasEl = ref(null)
-const cvRef = shallowRef(null)
+const page = ref('home')
+const captureStream = shallowRef(null)
 
-const statusText = computed(() => {
-  if (status.value === 'ready') return 'OpenCV 就绪'
-  if (status.value === 'error') return '加载失败'
-  return '加载中'
-})
-
-let startTime = 0
-const loadTime = computed(() => {
-  return performance.now() - startTime
-})
-
-
-onMounted(async () => {
-  startTime = performance.now()
-  try {
-    await waitForOpencv()
-    cvRef.value = globalThis.cv
-    status.value = 'ready'
-  } catch (error) {
-    status.value = 'error'
-    loadError.value = error instanceof Error ? error.message : 'OpenCV.js 加载失败'
-  }
-})
-
-onUnmounted(() => {
-  if (imageUrl.value) URL.revokeObjectURL(imageUrl.value)
-})
-
-function onPick(event) {
-  const file = event.target.files && event.target.files[0]
-  if (!file || status.value !== 'ready' || !cvRef.value) return
-
-  processError.value = ''
-  const url = URL.createObjectURL(file)
-  const previous = imageUrl.value
-  imageUrl.value = url
-  if (previous) URL.revokeObjectURL(previous)
-
-  const img = new Image()
-  img.onload = () => {
-    try {
-      readIntoMat(img)
-    } catch (error) {
-      matInfo.value = null
-      processError.value = error instanceof Error ? error.message : '无法处理这张图片'
-    }
-  }
-  img.onerror = () => {
-    matInfo.value = null
-    processError.value = '无法读取这张图片'
-  }
-  img.src = url
+function openCapture(stream) {
+  captureStream.value = stream
+  page.value = 'capture'
 }
 
-function readIntoMat(img) {
-  const canvas = canvasEl.value
-  const cv = cvRef.value
-  if (!canvas || !cv) return
-
-  canvas.width = img.naturalWidth
-  canvas.height = img.naturalHeight
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  ctx.drawImage(img, 0, 0)
-
-  const mat = cv.imread(canvas)
-  try {
-    matInfo.value = {
-      width: mat.cols,
-      height: mat.rows,
-      channels: mat.channels(),
-    }
-    cv.imshow(canvas, mat)
-  } finally {
-    mat.delete()
-  }
+function closeCapture() {
+  page.value = 'home'
+  captureStream.value = null
 }
 </script>
 
-<style scoped>
-.page {
-  box-sizing: border-box;
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 1.25rem 1rem 2rem;
-  font-family: system-ui, sans-serif;
-  color: #1a1a1a;
+<style>
+:root {
+  --main: #54C527;
+  --white: #fff;
+  --white-disabled: #fff6;
+  --black: #000;
+}
+</style>
+
+<style>
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  background: #000;
 }
 
-h1 {
-  margin: 0 0 0.75rem;
-  font-size: 1.5rem;
+html {
+  color-scheme: dark;
 }
 
-.status {
-  margin: 0 0 1rem;
-  font-weight: 650;
+body {
+  overflow: hidden;
 }
 
-.status[data-state='loading'] {
-  color: #8a5a00;
+.landscape {
+  display: none;
 }
 
-.status[data-state='ready'] {
-  color: #0b6b32;
-}
-
-.status[data-state='error'] {
-  color: #a32020;
-}
-
-.pick {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-.pick input {
-  font: inherit;
-}
-
-.mat,
-.hint,
-.error {
-  margin: 1rem 0 0;
-  line-height: 1.5;
-}
-
-.error {
-  color: #a32020;
-}
-
-.preview {
-  display: block;
-  width: 100%;
-  height: auto;
-  margin-top: 1rem;
-  background: #f3f3f3;
+@media (orientation: landscape) {
+  .landscape {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--black);
+    color: var(--white);
+    font-family: system-ui, sans-serif;
+    font-size: 1.05rem;
+    font-weight: 650;
+    line-height: 1.4;
+  }
 }
 </style>
