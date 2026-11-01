@@ -2,8 +2,11 @@ node_modules
 dist
 public/opencv.js
 public/opencv.js.download
+public/opencv_js.wasm
+public/opencv_js.wasm.download
 vendor/opencv.js
 vendor/opencv.js.download
+vendor/opencv.stamp
 .DS_Store
 *.local
 
