@@ -3,6 +3,7 @@
     <h1>Pool</h1>
     <p>用后置摄像头对准台面</p>
     <p class="status" :data-state="opencvState">{{ opencvText }}</p>
+    <p v-if="loadError" class="error">{{ loadError }}</p>
     <button type="button" :disabled="opening || opencvState !== 'ready'" @click="start">开始检测</button>
     <p v-if="errorText" class="error">{{ errorText }}</p>
   </main>
@@ -18,6 +19,7 @@ const emit = defineEmits(['start'])
 const opening = ref(false)
 const errorText = ref('')
 const opencvState = ref('loading')
+const loadError = ref('')
 
 const opencvText = computed(() => {
   if (opencvState.value === 'ready') return 'OpenCV 已就绪'
@@ -28,8 +30,9 @@ const opencvText = computed(() => {
 onMounted(() => {
   waitForOpencv().then(() => {
     opencvState.value = 'ready'
-  }).catch(() => {
+  }).catch((error) => {
     opencvState.value = 'error'
+    loadError.value = error instanceof Error ? error.message : 'OpenCV 加载失败'
   })
 })
 
