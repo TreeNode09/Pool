@@ -4,3 +4,6 @@ public/opencv.js
 public/opencv.js.download
 .DS_Store
 *.local
+
+python
+public/test
