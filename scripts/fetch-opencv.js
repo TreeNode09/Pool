@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { mkdir, rename, rm } from 'node:fs/promises'
+import { copyFile, mkdir, rename, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url'
 const OPENCV_URL = 'https://docs.opencv.org/5.0/opencv.js'
 const OPENCV_MD5 = '703926ba3f5967a21cbc3b5ab18c87a1'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const dest = path.join(root, 'public', 'opencv.js')
+const dest = path.join(root, 'vendor', 'opencv.js')
+const legacy = path.join(root, 'public', 'opencv.js')
 
 let pending = null
 
@@ -28,6 +29,12 @@ async function downloadIfNeeded() {
   if ((await fileMd5(dest)) === OPENCV_MD5) return dest
 
   await mkdir(path.dirname(dest), { recursive: true })
+  if ((await fileMd5(legacy)) === OPENCV_MD5) {
+    await copyFile(legacy, dest)
+    console.log('OpenCV.js 已放入 vendor/opencv.js')
+    return dest
+  }
+
   const tmp = `${dest}.download`
   console.log('正在下载 OpenCV.js…')
   const response = await fetch(OPENCV_URL)
@@ -54,7 +61,7 @@ async function downloadIfNeeded() {
 
   await rm(dest, { force: true })
   await rename(tmp, dest)
-  console.log('OpenCV.js 已保存到 public/opencv.js')
+  console.log('OpenCV.js 已保存到 vendor/opencv.js')
   return dest
 }
 

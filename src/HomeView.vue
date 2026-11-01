@@ -2,19 +2,36 @@
   <main class="home">
     <h1>Pool</h1>
     <p>用后置摄像头对准台面</p>
-    <button type="button" :disabled="opening" @click="start">开始检测</button>
+    <p class="status" :data-state="opencvState">{{ opencvText }}</p>
+    <button type="button" :disabled="opening || opencvState !== 'ready'" @click="start">开始检测</button>
     <p v-if="errorText" class="error">{{ errorText }}</p>
   </main>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { cameraErrorText, openCamera } from './camera.js'
+import { waitForOpencv } from './opencv.js'
 
 const emit = defineEmits(['start'])
 
 const opening = ref(false)
 const errorText = ref('')
+const opencvState = ref('loading')
+
+const opencvText = computed(() => {
+  if (opencvState.value === 'ready') return 'OpenCV 已就绪'
+  if (opencvState.value === 'error') return 'OpenCV 加载失败'
+  return '正在加载 OpenCV'
+})
+
+onMounted(() => {
+  waitForOpencv().then(() => {
+    opencvState.value = 'ready'
+  }).catch(() => {
+    opencvState.value = 'error'
+  })
+})
 
 async function start() {
   if (opening.value) return
@@ -78,6 +95,14 @@ button {
 button:disabled {
   cursor: default;
   opacity: 0.6;
+}
+
+.status[data-state='ready'] {
+  color: var(--main);
+}
+
+.status[data-state='error'] {
+  font-weight: 600;
 }
 
 .error {
